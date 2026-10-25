@@ -1,0 +1,92 @@
+{
+  "name": "BillSplitter Smart Agent Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bill-agent",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook-1",
+      "name": "Webhook - Bill Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.prompt }}",
+        "options": {
+          "systemMessage": "You are the BillSplitter Smart AI Agent. Your task is to extract expense details (title, amount, category, payer, and split breakdown) from natural language or receipt OCR text.\n\nMembers in this group: {{ JSON.stringify($json.body.members) }}\n\nAvailable Categories: Food & Dining, Groceries, Rent, Utilities, Travel, Entertainment, Supplies, Other.\n\nAlways output a structured JSON with:\n- title: string\n- amount: number\n- category: string\n- paid_by: string (user ID of payer or map of multi-payer amounts)\n- split_type: 'equal' | 'percentage' | 'exact'\n- splits: object mapping member ID to allocated amount\n- is_ready_to_save: boolean\n- agent_message: friendly response explaining the breakdown"
+        }
+      },
+      "id": "node-ai-agent-2",
+      "name": "AI Splitter Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Post-process and ensure clean JSON response\nconst input = $json;\nlet parsed = {};\ntry {\n  if (typeof input.output === 'string') {\n    const match = input.output.match(/\\{[\\s\\S]*\\}/);\n    parsed = match ? JSON.parse(match[0]) : { agent_message: input.output, is_ready_to_save: false };\n  } else {\n    parsed = input.output || input;\n  }\n} catch (e) {\n  parsed = {\n    agent_message: input.output || \"Could you please clarify the bill amount and who paid?\",\n    is_ready_to_save: false\n  };\n}\n\nreturn { json: parsed };"
+      },
+      "id": "node-code-parser-3",
+      "name": "Format JSON Split",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "node-respond-webhook-4",
+      "name": "Respond to BillSplitter App",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [960, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Bill Request": {
+      "main": [
+        [
+          {
+            "node": "AI Splitter Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Splitter Agent": {
+      "main": [
+        [
+          {
+            "node": "Format JSON Split",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format JSON Split": {
+      "main": [
+        [
+          {
+            "node": "Respond to BillSplitter App",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

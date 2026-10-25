@@ -1,0 +1,99 @@
+. Bill Splitter with Expense Prediction
+a). Objective:
+To design a smart bill-splitting and expense forecasting app for roommates, friends, and
+travel groups. The system will allow users to split shared bills, track balances, and predict
+future group expenses using spending patterns, helping improve financial transparency
+and planning in shared living or group activity scenarios.
+b). Problem Statement:
+Splitting shared expenses fairly and predicting group costs is often manual, error-prone,
+or forgotten. People lose track of who owes what, leading to misunderstandings or missed
+payments. Most bill-splitter apps lack expense forecasting, analytics, and AI insights. A
+smart system that automates splitting and offers spending predictions will improve group
+expense management.
+c). Scope:
+➢ Allow groups to split bills in real time
+➢ Track contributions, debts, and settle-ups
+➢ Analyze historical data to forecast upcoming expenses
+➢ Useful for flatmates, students, travel groups, shared projects
+➢ Cross-platform support (Android, iOS, Web)
+d). Features:
+➢ Group Creation & User Roles: Invite friends, assign admins, set rules
+➢ Bill Entry Interface: Add bills, split equally or custom, attach receipts
+➢ Settle Up Panel: Track dues and payments made
+➢ Expense Predictor: Use past trends to forecast next month’s expenses
+➢ Analytics Dashboard: Visualize who spends how much, recurring categories
+➢ Notifications: Alerts for due dates, low balances, and uneven contributions
+➢
+e). Tools and Technologies:
+➢ Languages: Dart (Flutter), Python
+➢ Frontend: Flutter (cross-platform mobile), React (optional web dashboard)
+➢ Backend: Flask / Django REST API
+141
+➢ Database: Firebase Realtime DB or PostgreSQL
+➢ ML Models: Time-series forecasting (ARIMA, Prophet)
+➢ APIs: UPI/Paytm API (for settle-up payments), Notification API
+f). Workflow:
+➢ User creates a group and adds members
+➢ Bills are logged with details and custom splits
+➢ Each member’s balance is updated instantly
+➢ Past data is used to run ML forecasting for upcoming recurring expenses
+➢ App sends alerts before due dates or predicted high-spend periods
+➢ Payment logs and final summaries are exported if needed
+g). Expected Outcomes:
+➢ Improved accountability and fairness in group spending
+➢ Less confusion around balances and splits
+➢ Better budgeting and cash flow awareness
+➢ Enhanced user trust through automated transparency
+h). Future Enhancements:
+➢ Gamified saving goals for group trips or parties
+➢ Currency conversion for international travel
+➢ Voice input and receipt OCR to auto-log expenses
+➢ Smart reminders based on behavior (e.g., weekend parties)
+➢ Integration with budgeting apps (e.g., Walnut, YNAB, Google Pay)
+
+the plan, simply put:
+Build the main app (all 6 features) using React (web) or Flask (backend) — this is your "normal app" that works even without AI
+Separately build your AI agent workflow in n8n (the smart chat that handles bill scanning, multi-payer splits, questions, etc.)
+Connect the two — your app calls the n8n chat whenever the user wants to use the "smart" way of adding a bill
+Deploy both
+
+Part 1: Core app (build this first, no AI yet)
+Feature
+What it needs
+Group Creation & Roles
+User signup/login, create group, invite members, admin permissions
+Bill Entry (manual)
+Form to add bill, choose equal/custom split, attach receipt image
+Settle Up Panel
+Show balances, mark as paid, payment history
+Analytics Dashboard
+Simple charts — who spent how much, by category
+Notifications
+Due date reminders, low balance alerts
+Tech: React (frontend) + Flask (backend API) + PostgreSQL or Firebase (database). This alone is a complete, working bill-splitter — a full project on its own.
+Part 2: The "smart" layer (n8n agent) — this is your differentiator
+Handles: scanning receipts, asking "who paid what %," multi-payer splits, smart reminders based on payment behavior
+This talks to your Flask backend to actually save the calculated split (the agent doesn't need its own database — it just calculates and sends results to your app's database)
+Part 3: Expense Predictor (ML)
+This is separate from the n8n agent — it's a Python script using Prophet or ARIMA that runs periodically (like once a day/week) on your stored expense data and pushes predictions back into your app
+Doesn't need to be "agentic" — it's a straightforward scheduled ML job
+How they connect (simple flow):
+User opens app → clicks "Add bill via chat" 
+     ↓
+App sends message to n8n webhook (your agent)
+     ↓
+Agent asks questions, reads receipt, calculates split
+     ↓
+Agent sends final result back to your Flask API
+     ↓
+Flask saves it to database → updates balances
+     ↓
+App shows updated balances to all group members
+Suggested order to build (so you're not stuck for months):
+Backend first (Flask API + database) — get basic CRUD working: create group, add bill, calculate simple equal split
+Frontend (React) — connect to backend, build basic screens
+Settle-up + notifications
+n8n agent — connect it to your existing Flask API (this becomes easy since your API already exists)
+Analytics dashboard (just charts on existing data)
+Expense predictor (ML) — add this last since it needs historical data to even be useful
+This way, at every stage you have something working and demoable, even if you stop midway.
