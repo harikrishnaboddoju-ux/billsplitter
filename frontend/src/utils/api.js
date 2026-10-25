@@ -4,9 +4,27 @@
  */
 
 // Centralized API Base URL:
-// In production (Render Static Site), set VITE_API_URL to the Render Web Service URL (e.g. https://billsplitter-api-1spb.onrender.com)
-// In local development, an empty string uses Vite's proxy configured in vite.config.js
-export const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+// 1. Explicit VITE_API_URL environment variable (from Render dashboard or .env.production)
+// 2. Production fallback: when running on Render or built for production, defaults to deployed backend
+// 3. Local development: empty string (leverages Vite's local /api proxy to http://127.0.0.1:5000)
+const DEFAULT_PROD_BACKEND_URL = 'https://billsplitter-api-1spb.onrender.com';
+
+function resolveApiBaseUrl() {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && envUrl.trim()) {
+    return envUrl.trim();
+  }
+  // If running in production or on Render static site domain
+  if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
+    return DEFAULT_PROD_BACKEND_URL;
+  }
+  if (import.meta.env.PROD) {
+    return DEFAULT_PROD_BACKEND_URL;
+  }
+  return '';
+}
+
+export const API_BASE_URL = resolveApiBaseUrl().replace(/\/+$/, '');
 
 /**
  * Resolves a backend file path (like /api/uploads/receipt.jpg) to a fully-qualified URL.
