@@ -52,6 +52,7 @@ export default function App() {
   const [forecastData, setForecastData] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState(null);
 
   // Modals
   const [isAddBillOpen, setIsAddBillOpen] = useState(false);
@@ -126,37 +127,40 @@ export default function App() {
   };
 
   // Initial Data Bootstrapping
-  useEffect(() => {
-    async function initData() {
-      setLoading(true);
-      try {
-        const [fetchedUsers, fetchedGroups] = await Promise.all([
-          fetchUsers(),
-          fetchGroups()
-        ]);
+  const initData = async () => {
+    setLoading(true);
+    setConnectionError(null);
+    try {
+      const [fetchedUsers, fetchedGroups] = await Promise.all([
+        fetchUsers(),
+        fetchGroups()
+      ]);
 
-        setUsers(fetchedUsers);
-        const hariKrishnaUser = fetchedUsers.find(u => u.name?.toLowerCase().includes('hari krishna')) || fetchedUsers[0];
-        if (hariKrishnaUser) {
-          setCurrentUser(hariKrishnaUser);
-        }
-
-        setGroups(fetchedGroups);
-        if (fetchedGroups.length > 0) {
-          const firstGroupId = fetchedGroups[0].id;
-          setCurrentGroupId(firstGroupId);
-          await loadGroup(firstGroupId);
-        }
-
-        if (hariKrishnaUser) {
-          await refreshNotifications(hariKrishnaUser.id);
-        }
-      } catch (err) {
-        console.error('Initialization error:', err);
-      } finally {
-        setLoading(false);
+      setUsers(fetchedUsers);
+      const hariKrishnaUser = fetchedUsers.find(u => u.name?.toLowerCase().includes('hari krishna')) || fetchedUsers[0];
+      if (hariKrishnaUser) {
+        setCurrentUser(hariKrishnaUser);
       }
+
+      setGroups(fetchedGroups);
+      if (fetchedGroups.length > 0) {
+        const firstGroupId = fetchedGroups[0].id;
+        setCurrentGroupId(firstGroupId);
+        await loadGroup(firstGroupId);
+      }
+
+      if (hariKrishnaUser) {
+        await refreshNotifications(hariKrishnaUser.id);
+      }
+    } catch (err) {
+      console.error('Initialization error:', err);
+      setConnectionError(err.message || 'Failed to connect to BillSplitter backend service.');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     initData();
   }, []);
 
@@ -327,7 +331,35 @@ export default function App() {
       />
 
       {/* Main Body */}
-      {groups.length === 0 || !currentGroup ? (
+      {connectionError && groups.length === 0 ? (
+        <main className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+          <div className="glass-card" style={{ maxWidth: '540px', padding: '36px', textAlign: 'center' }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: 'var(--radius-lg)',
+              background: 'rgba(244, 63, 94, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--rose)',
+              margin: '0 auto 18px'
+            }}>
+              <Layers size={32} />
+            </div>
+            <h2 style={{ fontSize: '1.35rem', marginBottom: '10px' }}>Backend Service Connecting...</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '20px', lineHeight: 1.6 }}>
+              {connectionError}
+            </p>
+            <div style={{ background: 'var(--bg-card-solid)', borderRadius: 'var(--radius-md)', padding: '12px 16px', fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '24px', textAlign: 'left', border: '1px solid var(--border-color)' }}>
+              💡 <strong>Render Free Tier Notice:</strong> Inactive web services spin down automatically. The initial wake-up can take 30 to 60 seconds.
+            </div>
+            <button className="btn-primary" onClick={initData} style={{ padding: '12px 28px', fontSize: '0.95rem', margin: '0 auto' }}>
+              Retry Connection
+            </button>
+          </div>
+        </main>
+      ) : groups.length === 0 || !currentGroup ? (
         <main className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
           <div className="glass-card" style={{ maxWidth: '520px', padding: '40px', textAlign: 'center' }}>
             <div style={{

@@ -9,11 +9,19 @@ from flask_cors import CORS
 import os
 import uuid
 import json
+import logging
 from datetime import datetime
 
 import sys
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger("billsplitter")
 
 from database import (
     init_db, get_db_connection, get_all_users, get_groups, get_group_details
@@ -22,11 +30,50 @@ from settle_service import calculate_group_balances, simplify_debts
 from ml_predictor import forecast_group_expenses
 from smart_agent import parse_natural_language_bill, forward_to_n8n_webhook
 
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
+UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", os.path.join(os.path.dirname(__file__), "uploads"))
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# Determine allowed CORS origins for Render deployment and local development
+def get_allowed_origins():
+    env_origins = os.getenv("ALLOWED_ORIGINS") or os.getenv("FRONTEND_URL") or ""
+    configured = [o.strip().rstrip("/") for o in env_origins.split(",") if o.strip()]
+    
+    defaults = [
+        "https://billsplitter-frontend-g4qp.onrender.com",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+    ]
+    
+    merged = list(defaults)
+    for origin in configured:
+        if origin not in merged:
+            merged.append(origin)
+    return merged
+
+allowed_origins = get_allowed_origins()
+logger.info(f"Allowed CORS origins: {allowed_origins}")
+
 app = Flask(__name__)
-CORS(app)
+CORS(
+    app,
+    resources={r"/api/*": {"origins": allowed_origins}},
+    supports_credentials=True,
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With"]
+)
+
+@app.before_request
+def log_request_info():
+    if request.path != "/api/health":
+        logger.info(f"--> {request.method} {request.path}")
+
+@app.after_request
+def log_response_info(response):
+    if request.path != "/api/health":
+        logger.info(f"<-- {request.method} {request.path} {response.status_code}")
+    return response
 
 # Initialize database schema and seed data on startup
 init_db()
@@ -478,7 +525,7 @@ def smart_agent_chat():
     prompt = data.get("message", "").strip()
     group_id = data.get("group_id")
     current_user_id = data.get("user_id")
-    n8n_webhook_url = data.get("n8n_webhook_url")
+    n8n_webhook_url = data.get("n8n_webhook_url") or os.getenv("N8N_WEBHOOK_URL")
 
     if not prompt:
         return jsonify({"error": "Message is required"}), 400
@@ -688,5 +735,7 @@ def export_group_data(group_id):
 
 
 if __name__ == "__main__":
-    print("Starting Bill Splitter API on port 5000...")
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.getenv("PORT", 5000))
+    debug = os.getenv("FLASK_DEBUG", "false").lower() in ("true", "1", "t")
+    logger.info(f"Starting Bill Splitter API on port {port} (debug={debug})...")
+    app.run(host="0.0.0.0", port=port, debug=debug)

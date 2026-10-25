@@ -11,7 +11,7 @@ import {
   Check,
   Edit2
 } from 'lucide-react';
-import { markNotificationsRead } from '../utils/api';
+import { markNotificationsRead, getExportGroupUrl } from '../utils/api';
 
 export default function Navbar({
   groups,
@@ -67,7 +67,7 @@ export default function Navbar({
 
   const handleExportCSV = () => {
     if (currentGroup?.id) {
-      window.open(`/api/groups/${currentGroup.id}/export`, '_blank');
+      window.open(getExportGroupUrl(currentGroup.id), '_blank');
     }
   };
 

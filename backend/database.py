@@ -9,10 +9,16 @@ import os
 import uuid
 from datetime import datetime, timedelta
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "billsplitter.db")
+DB_PATH = os.getenv("DATABASE_PATH", os.getenv("DB_PATH", os.path.join(os.path.dirname(__file__), "billsplitter.db")))
+
+# Ensure parent directory exists for persistent disk paths
+_db_dir = os.path.dirname(os.path.abspath(DB_PATH))
+if _db_dir:
+    os.makedirs(_db_dir, exist_ok=True)
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    # timeout=20.0 prevents locks during concurrent requests across Gunicorn workers
+    conn = sqlite3.connect(DB_PATH, timeout=20.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 

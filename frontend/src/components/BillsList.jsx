@@ -8,6 +8,7 @@ import {
   X,
   ExternalLink
 } from 'lucide-react';
+import { getFileUrl } from '../utils/api';
 
 const CATEGORY_ICONS = {
   'Rent': '🏠',
@@ -214,7 +215,7 @@ export default function BillsList({
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <a 
-                  href={selectedReceipt} 
+                  href={getFileUrl(selectedReceipt)} 
                   target="_blank" 
                   rel="noreferrer" 
                   className="btn-icon" 
@@ -229,13 +230,14 @@ export default function BillsList({
             </div>
             <div style={{ textAlign: 'center', background: 'var(--bg-card-solid)', borderRadius: 'var(--radius-md)', padding: '12px', overflow: 'hidden' }}>
               <img 
-                src={selectedReceipt} 
+                src={getFileUrl(selectedReceipt)} 
                 alt="Receipt Document" 
                 style={{ maxWidth: '100%', maxHeight: '450px', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} 
                 onError={(e) => {
                   e.target.onerror = null;
                   e.target.style.display = 'none';
-                  e.target.parentNode.innerHTML = `<div style="padding: 40px; color: var(--text-muted)">Receipt preview available at: <a href="${selectedReceipt}" target="_blank" style="color: var(--accent-primary)">${selectedReceipt}</a></div>`;
+                  const receiptLink = getFileUrl(selectedReceipt);
+                  e.target.parentNode.innerHTML = `<div style="padding: 40px; color: var(--text-muted)">Receipt preview available at: <a href="${receiptLink}" target="_blank" style="color: var(--accent-primary)">${receiptLink}</a></div>`;
                 }}
               />
             </div>

@@ -1,168 +1,202 @@
 /**
  * API Client for BillSplitter Backend
+ * Configured with centralized VITE_API_URL environment variable for Render deployment.
  */
 
-const BASE_URL = ''; // Relative path leverages Vite's proxy '/api'
+// Centralized API Base URL:
+// In production (Render Static Site), set VITE_API_URL to the Render Web Service URL (e.g. https://billsplitter-api-1spb.onrender.com)
+// In local development, an empty string uses Vite's proxy configured in vite.config.js
+export const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
 
-async function handleResponse(res, defaultError) {
-  if (!res.ok) {
-    let message = defaultError;
-    try {
-      const data = await res.json();
-      if (data && data.error) {
-        message = data.error;
-      }
-    } catch (_) {}
-    throw new Error(message);
+/**
+ * Resolves a backend file path (like /api/uploads/receipt.jpg) to a fully-qualified URL.
+ */
+export function getFileUrl(path) {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+    return path;
   }
-  return res.json();
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${API_BASE_URL}${cleanPath}`;
+}
+
+/**
+ * Resolves the CSV export URL for a group.
+ */
+export function getExportGroupUrl(groupId) {
+  return `${API_BASE_URL}/api/groups/${groupId}/export`;
+}
+
+/**
+ * Centralized fetch wrapper with robust error handling for failed requests and Render cold starts.
+ */
+async function apiRequest(endpoint, options = {}, defaultError = 'Request failed') {
+  const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  
+  try {
+    const res = await fetch(url, options);
+
+    if (!res.ok) {
+      let message = `${defaultError} (${res.status})`;
+      try {
+        const data = await res.json();
+        if (data && data.error) {
+          message = data.error;
+        }
+      } catch (_) {}
+      const error = new Error(message);
+      error.status = res.status;
+      throw error;
+    }
+
+    return await res.json();
+  } catch (err) {
+    // Detect network / connection failures (e.g. Render Web Service asleep on free tier)
+    if (err.name === 'TypeError' && err.message.toLowerCase().includes('fetch')) {
+      const connError = new Error(
+        'Unable to connect to BillSplitter server. If deployed on Render free tier, the backend may take 30-60 seconds to spin up from sleep.'
+      );
+      connError.isNetworkError = true;
+      throw connError;
+    }
+    throw err;
+  }
+}
+
+export async function checkBackendHealth() {
+  return apiRequest('/api/health', {}, 'Backend health check failed');
 }
 
 export async function fetchUsers() {
-  const res = await fetch(`${BASE_URL}/api/users`);
-  return handleResponse(res, 'Failed to fetch users');
+  return apiRequest('/api/users', {}, 'Failed to fetch users');
 }
 
 export async function createUser(userData) {
-  const res = await fetch(`${BASE_URL}/api/users`, {
+  return apiRequest('/api/users', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(userData),
-  });
-  return handleResponse(res, 'Failed to create user');
+  }, 'Failed to create user');
 }
 
 export async function updateUserProfile(userId, userData) {
-  const res = await fetch(`${BASE_URL}/api/users/${userId}`, {
+  return apiRequest(`/api/users/${userId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(userData),
-  });
-  return handleResponse(res, 'Failed to update user profile');
+  }, 'Failed to update user profile');
 }
 
 export async function fetchGroups() {
-  const res = await fetch(`${BASE_URL}/api/groups`);
-  return handleResponse(res, 'Failed to fetch groups');
+  return apiRequest('/api/groups', {}, 'Failed to fetch groups');
 }
 
 export async function fetchGroupDetails(groupId) {
-  const res = await fetch(`${BASE_URL}/api/groups/${groupId}`);
-  return handleResponse(res, 'Failed to fetch group details');
+  return apiRequest(`/api/groups/${groupId}`, {}, 'Failed to fetch group details');
 }
 
 export async function deleteGroup(groupId) {
-  const res = await fetch(`${BASE_URL}/api/groups/${groupId}`, {
+  return apiRequest(`/api/groups/${groupId}`, {
     method: 'DELETE',
-  });
-  return handleResponse(res, 'Failed to delete group');
+  }, 'Failed to delete group');
 }
 
 export async function updateGroup(groupId, groupData) {
-  const res = await fetch(`${BASE_URL}/api/groups/${groupId}`, {
+  return apiRequest(`/api/groups/${groupId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(groupData),
-  });
-  return handleResponse(res, 'Failed to update group');
+  }, 'Failed to update group');
 }
 
 export async function createGroup(groupData) {
-  const res = await fetch(`${BASE_URL}/api/groups`, {
+  return apiRequest('/api/groups', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(groupData),
-  });
-  return handleResponse(res, 'Failed to create group');
+  }, 'Failed to create group');
 }
 
 export async function addGroupMember(groupId, memberData) {
-  const res = await fetch(`${BASE_URL}/api/groups/${groupId}/members`, {
+  return apiRequest(`/api/groups/${groupId}/members`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(memberData),
-  });
-  return handleResponse(res, 'Failed to add member to group');
+  }, 'Failed to add member to group');
 }
 
 export async function updateMemberRole(groupId, userId, role) {
-  const res = await fetch(`${BASE_URL}/api/groups/${groupId}/members/${userId}`, {
+  return apiRequest(`/api/groups/${groupId}/members/${userId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ role }),
-  });
-  return handleResponse(res, 'Failed to update member role');
+  }, 'Failed to update member role');
 }
 
-
 export async function addBill(groupId, billData) {
-  const res = await fetch(`${BASE_URL}/api/groups/${groupId}/bills`, {
+  return apiRequest(`/api/groups/${groupId}/bills`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(billData),
-  });
-  return handleResponse(res, 'Failed to add bill');
+  }, 'Failed to add bill');
 }
 
 export async function deleteBill(groupId, billId) {
-  const res = await fetch(`${BASE_URL}/api/groups/${groupId}/bills/${billId}`, {
+  return apiRequest(`/api/groups/${groupId}/bills/${billId}`, {
     method: 'DELETE',
-  });
-  return handleResponse(res, 'Failed to delete bill');
+  }, 'Failed to delete bill');
 }
 
 export async function recordSettlement(groupId, settleData) {
-  const res = await fetch(`${BASE_URL}/api/groups/${groupId}/settle`, {
+  return apiRequest(`/api/groups/${groupId}/settle`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(settleData),
-  });
-  return handleResponse(res, 'Failed to record settlement');
+  }, 'Failed to record settlement');
 }
 
 export async function fetchForecast(groupId) {
-  const res = await fetch(`${BASE_URL}/api/groups/${groupId}/forecast`);
-  return handleResponse(res, 'Failed to fetch expense forecast');
+  return apiRequest(`/api/groups/${groupId}/forecast`, {}, 'Failed to fetch expense forecast');
 }
 
 export async function smartAgentChat(payload) {
-  const res = await fetch(`${BASE_URL}/api/smart-agent/chat`, {
+  return apiRequest('/api/smart-agent/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  });
-  return handleResponse(res, 'Failed to query smart agent');
+  }, 'Failed to query smart agent');
 }
 
 export async function scanReceiptPreset(preset) {
-  const res = await fetch(`${BASE_URL}/api/receipt-scan`, {
+  return apiRequest('/api/receipt-scan', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ preset }),
-  });
-  return handleResponse(res, 'Failed to scan receipt');
+  }, 'Failed to scan receipt');
 }
 
 export async function fetchNotifications(userId) {
-  const res = await fetch(`${BASE_URL}/api/notifications?user_id=${userId}`);
-  return handleResponse(res, 'Failed to fetch notifications');
+  return apiRequest(`/api/notifications?user_id=${encodeURIComponent(userId)}`, {}, 'Failed to fetch notifications');
 }
 
 export async function markNotificationsRead(userId) {
-  const res = await fetch(`${BASE_URL}/api/notifications/read`, {
+  return apiRequest('/api/notifications/read', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user_id: userId }),
-  });
-  return handleResponse(res, 'Failed to mark notifications read');
+  }, 'Failed to mark notifications read');
 }
 
 export async function uploadReceiptFile(file) {
   const formData = new FormData();
   formData.append('file', file);
-  const res = await fetch(`${BASE_URL}/api/upload`, {
+  const data = await apiRequest('/api/upload', {
     method: 'POST',
     body: formData,
-  });
-  return handleResponse(res, 'Failed to upload receipt file');
+  }, 'Failed to upload receipt file');
+  
+  return {
+    ...data,
+    full_url: getFileUrl(data.url)
+  };
 }
